@@ -205,3 +205,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# Bỏ qua thư mục .idea và tất cả nội dung bên trong
+.idea/
+
+# Bỏ qua tất cả file .xml
+*.xml
