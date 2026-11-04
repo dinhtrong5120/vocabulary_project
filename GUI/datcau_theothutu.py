@@ -1,5 +1,4 @@
 import sys
-import random
 import pandas as pd
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton
@@ -13,16 +12,31 @@ class FlashcardApp(QWidget):
         # Thiết lập kích thước tối đa của cửa sổ
         self.setMaximumWidth(700)
 
-        # Đọc dữ liệu từ file Excel
-        # self.data = pd.read_excel(excel_file, usecols=[0, 1, 2], engine='openpyxl', sheet_name='Sheet1')
         self.data = pd.read_excel(excel_file)
-        self.data.columns = ['A', 'C', 'LESSON']
-        # self.data = self.data[self.data['LESSON'] == 15]
-        self.data = self.data[self.data['LESSON'].isin([1])]
+        if {'Từ vựng hoặc cụm từ', 'Dịch nghĩa'}.issubset(self.data.columns):
+            columns = ['Từ vựng hoặc cụm từ', 'Dịch nghĩa']
+        else:
+            columns = ['Nội dung câu hỏi', 'Giải thích']
+            columns += [f'Phương án {i}' for i in range(1, 5)]
+            if not set(columns).issubset(self.data.columns):
+                raise ValueError('File Excel cần có các cột từ vựng/nghĩa hoặc câu hỏi/giải thích và 4 phương án.')
+
+        self.data = self.data.dropna(subset=columns)
+        if self.data.empty:
+            raise ValueError('File Excel không có dòng dữ liệu đầy đủ để học.')
 
         # Danh sách từ vựng và nghĩa
-        self.words = self.data['A'].tolist()
-        self.meanings = self.data['C'].tolist()
+        self.words = self.data[columns[0]].astype(str).tolist()
+        self.meanings = self.data[columns[1]].astype(str).tolist()
+        self.word_types = (
+            self.data['Phân loại'].fillna('').astype(str).tolist()
+            if 'Phân loại' in self.data.columns else [''] * len(self.data)
+        )
+        if len(columns) > 2:
+            for index, options in enumerate(self.data[columns[2:]].itertuples(index=False, name=None)):
+                self.words[index] += '\n\n' + '\n'.join(
+                    f'{letter}. {option}' for letter, option in zip('ABCD', options)
+                )
 
         # Chỉ mục từ vựng
         self.current_position = 0
@@ -34,6 +48,10 @@ class FlashcardApp(QWidget):
         self.label.setAlignment(Qt.AlignCenter)
         self.label.setStyleSheet("font-size: 24px;")
         self.label.setWordWrap(True)
+        self.type_label = QLabel('', self)
+        self.type_label.setAlignment(Qt.AlignCenter)
+        self.type_label.setStyleSheet('font-size: 18px; color: #666666;')
+        self.type_label.setWordWrap(True)
 
         self.button = QPushButton('Hiển thị nghĩa', self)
         self.button.setFixedHeight(50)
@@ -43,6 +61,7 @@ class FlashcardApp(QWidget):
         self.next_button.clicked.connect(self.next_card)
 
         self.layout.addWidget(self.label)
+        self.layout.addWidget(self.type_label)
         self.layout.addWidget(self.button)
         self.layout.addWidget(self.next_button)
 
@@ -50,6 +69,9 @@ class FlashcardApp(QWidget):
         self.update_card()
 
     def update_card(self):
+        word_type = self.word_types[self.current_position]
+        self.type_label.setText(f'{word_type}' if word_type else '')
+        self.type_label.setVisible(bool(word_type))
         if self.show_meaning:
             self.label.setText(self.meanings[self.current_position])
             self.button.setText('Hiển thị từ')
@@ -79,7 +101,7 @@ class FlashcardApp(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    excel_file = 'all_duplicate_ets2023_20250801_234855.xlsx'  # Đường dẫn tới file Excel của bạn
+    excel_file = '/Users/TrongKieu/Developer/study/English/ETS_2023/TEST1/bang_tu_vung_part5_test1_2023.xlsx'
     flashcard_app = FlashcardApp(excel_file)
     flashcard_app.show()
     sys.exit(app.exec_())
